@@ -41,8 +41,10 @@ services:
       - ./src:/home/gaia/src:ro
       # Mount gaia_private to PYTHONPATH root (can't mount over symlink in src/)
       - ../../gaia-private:/home/gaia/gaia_private:ro
-      # Mount private scripts (includes startup/ and other runtime scripts)
-      - ../../gaia-private/_scripts/backend:/home/gaia/scripts:ro
+      # Mount gaia-free scripts (entrypoints, etc.)
+      - ../scripts/backend:/home/gaia/scripts:ro
+      # Mount private scripts to separate location
+      - ../../gaia-private/_scripts/backend:/home/gaia/private_scripts:ro
       - ./test:/home/gaia/test:ro
       - ./tests:/home/gaia/tests:ro
       - ./audio_samples:/home/gaia/audio_samples:ro
@@ -92,8 +94,10 @@ services:
       - ./src:/home/gaia/src
       # Mount gaia_private to PYTHONPATH root (can't mount over symlink in src/)
       - ../../gaia-private:/home/gaia/gaia_private:ro
-      # Mount private scripts (includes startup/ and other runtime scripts)
-      - ../../gaia-private/_scripts/backend:/home/gaia/scripts:ro
+      # Mount gaia-free scripts (entrypoints, etc.)
+      - ../scripts/backend:/home/gaia/scripts:ro
+      # Mount private scripts to separate location
+      - ../../gaia-private/_scripts/backend:/home/gaia/private_scripts:ro
       - ./test:/home/gaia/test
       - ./tests:/home/gaia/tests
       - ./audio_samples:/home/gaia/audio_samples

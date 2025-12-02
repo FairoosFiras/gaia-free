@@ -53,6 +53,7 @@ init: ## initialize the environment
 
 .PHONY: build
 build: ## build docker images
+	mkdir -p secrets
 	cp $(KEY_FILE) secrets/age-key.txt
 	docker compose --profile dev $(COMPOSE_FILES) build --build-arg ARCH=$(ARCH) $(SERVICES)
 
