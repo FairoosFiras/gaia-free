@@ -85,7 +85,24 @@ jobs:
           cp ../gaia-private/_settings/frontend.settings.docker.env frontend/.settings.docker.env
           cp ../gaia-private/_settings/speech-to-text.settings.docker.env speech-to-text/.settings.docker.env
           cp ../gaia-private/_config/*.env config/
+          mkdir -p secrets
+          cp ../gaia-private/_secrets/.secrets.env secrets/.secrets.env
           ln -sf $(realpath ../gaia-private) backend/src/gaia_private
+
+      - name: Install sops
+        run: |
+          SOPS_VERSION="3.9.3"
+          curl -LO "https://github.com/getsops/sops/releases/download/v${SOPS_VERSION}/sops-v${SOPS_VERSION}.linux.amd64"
+          sudo mv "sops-v${SOPS_VERSION}.linux.amd64" /usr/local/bin/sops
+          sudo chmod +x /usr/local/bin/sops
+
+      - name: Decrypt secrets
+        env:
+          SOPS_AGE_KEY: ${{ secrets.SOPS_AGE_KEY }}
+        run: |
+          sops -d secrets/.secrets.env > secrets/.secrets.env.decrypted
+          # Export secrets to GITHUB_ENV for subsequent steps
+          grep POSTGRES_PASSWORD secrets/.secrets.env.decrypted >> $GITHUB_ENV
 
       - name: Build docker images
         run: |
@@ -102,7 +119,7 @@ jobs:
       - name: Start services in detached mode
         timeout-minutes: 1
         run: |
-          make start DETACH=--detach 
+          make start DETACH=--detach
           until [ "$(docker inspect -f '{{.State.Health.Status}}' gaia-backend-dev)" = "healthy" ]; do
            echo "  still waiting for gaia-backend ...";
               sleep 1;
