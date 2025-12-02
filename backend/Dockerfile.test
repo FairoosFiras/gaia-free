@@ -19,7 +19,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 
 # Install Python dependencies with cache mount
 WORKDIR /build
-COPY requirements.txt .
+COPY backend/requirements.txt .
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --user -r requirements.txt && \
     pip install --user pytest pytest-asyncio pytest-cov pytest-mock
@@ -76,10 +76,10 @@ RUN --mount=type=cache,target=/home/gaia/.ollama/models,uid=1000,gid=1000 \
     pkill ollama || true
 
 # Copy application code and test files
-COPY --chown=gaia:gaia src/ ./src/
-COPY --chown=gaia:gaia scripts/ ./scripts/
-COPY --chown=gaia:gaia test/ ./test/
-COPY --chown=gaia:gaia scripts/entrypoint.sh /home/gaia/entrypoint.sh
+COPY --chown=gaia:gaia backend/src/ ./src/
+COPY --chown=gaia:gaia scripts/backend/ ./scripts/
+COPY --chown=gaia:gaia backend/test/ ./test/
+COPY --chown=gaia:gaia scripts/backend/entrypoint.sh /home/gaia/entrypoint.sh
 
 # Make entrypoint executable
 RUN chmod +x /home/gaia/entrypoint.sh

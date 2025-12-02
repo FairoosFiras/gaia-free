@@ -117,12 +117,9 @@ credentials/
 # Scripts that shouldn't be in production
 scripts/claude_helpers/
 scripts/test_*.py
-scripts/*.sh
-backend/scripts/claude_helpers/
-backend/scripts/test_*.py
-!backend/scripts/entrypoint.sh
-!backend/scripts/entrypoint_cloud_run.py
-!backend/scripts/postgres-entrypoint.sh
+# Allow scripts/backend/ for Docker builds
+!scripts/backend/
+!scripts/speech-to-text/
 
 
 # Development specific files

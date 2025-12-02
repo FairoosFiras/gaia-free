@@ -19,8 +19,8 @@
 services:
   dev:
     build:
-      context: .
-      dockerfile: Dockerfile.dev
+      context: ..
+      dockerfile: backend/Dockerfile.dev
       args:
         - BUILDKIT_INLINE_CACHE=1
     container_name: gaia-backend-dev
@@ -39,7 +39,10 @@ services:
     volumes:
       # Development: bind mounts for hot-reload, named volume for logs
       - ./src:/home/gaia/src:ro
-      - ./scripts:/home/gaia/scripts:ro
+      # Mount gaia_private to PYTHONPATH root (can't mount over symlink in src/)
+      - ../../gaia-private:/home/gaia/gaia_private:ro
+      # Mount private scripts (includes startup/ and other runtime scripts)
+      - ../../gaia-private/_scripts/backend:/home/gaia/scripts:ro
       - ./test:/home/gaia/test:ro
       - ./tests:/home/gaia/tests:ro
       - ./audio_samples:/home/gaia/audio_samples:ro
@@ -71,8 +74,8 @@ services:
 
   gpu:
     build:
-      context: .
-      dockerfile: Dockerfile.dev
+      context: ..
+      dockerfile: backend/Dockerfile.dev
       args:
         - BUILDKIT_INLINE_CACHE=1
     container_name: gaia-backend-gpu
@@ -87,7 +90,10 @@ services:
     volumes:
       # GPU development: bind mounts for hot-reload, named volume for logs
       - ./src:/home/gaia/src
-      - ./scripts:/home/gaia/scripts
+      # Mount gaia_private to PYTHONPATH root (can't mount over symlink in src/)
+      - ../../gaia-private:/home/gaia/gaia_private:ro
+      # Mount private scripts (includes startup/ and other runtime scripts)
+      - ../../gaia-private/_scripts/backend:/home/gaia/scripts:ro
       - ./test:/home/gaia/test
       - ./tests:/home/gaia/tests
       - ./audio_samples:/home/gaia/audio_samples
@@ -126,8 +132,8 @@ services:
 
   prod:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: backend/Dockerfile
       args:
         - BUILDKIT_INLINE_CACHE=1
     container_name: gaia-backend-prod
@@ -155,8 +161,8 @@ services:
 
   test:
     build:
-      context: .
-      dockerfile: Dockerfile.test
+      context: ..
+      dockerfile: backend/Dockerfile.test
       args:
         - BUILDKIT_INLINE_CACHE=1
     container_name: gaia-backend-test
@@ -168,6 +174,8 @@ services:
     volumes:
       # Mount source code for testing
       - ./src:/home/gaia/src
+      # Mount gaia_private to PYTHONPATH root (can't mount over symlink in src/)
+      - ../../gaia-private:/home/gaia/gaia_private:ro
       - ./test:/home/gaia/test
       - ./tests:/home/gaia/tests
       # Mount auth and db submodules

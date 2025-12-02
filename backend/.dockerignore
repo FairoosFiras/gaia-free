@@ -119,6 +119,8 @@ scripts/claude_helpers/
 scripts/test_*.py
 scripts/*.sh
 !scripts/entrypoint.sh
+!scripts/backend/entrypoint.sh
+
 
 # Development specific files
 *.bak

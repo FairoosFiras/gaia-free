@@ -23,7 +23,7 @@ CAMPAIGNS_CLONE_DIR="$PARENT_DIR/gaia-campaigns"
 
 # Symlink targets inside gaia-free
 PRIVATE_LINK="$ROOT_DIR/backend/src/gaia_private"
-CAMPAIGNS_LINK="$ROOT_DIR/backend/src/gaia_campaigns"
+# Note: campaigns go at root level as campaign_storage/, not under backend/src/
 
 # Colors for output
 RED='\033[0;31m'
@@ -61,10 +61,18 @@ setup_private_clone() {
     log_info "Setting up gaia-private..."
 
     if [ -d "$PRIVATE_CLONE_DIR" ]; then
-        log_info "  gaia-private already cloned, pulling latest..."
-        (cd "$PRIVATE_CLONE_DIR" && git pull origin main) || {
-            log_warn "  Pull failed - you may need to resolve conflicts"
-        }
+        # Check if it's actually a git repository
+        if [ -d "$PRIVATE_CLONE_DIR/.git" ]; then
+            log_info "  gaia-private already cloned, pulling latest..."
+            (cd "$PRIVATE_CLONE_DIR" && git pull origin main) || {
+                log_warn "  Pull failed - you may need to resolve conflicts"
+            }
+        else
+            # Directory exists but is not a git repo - remove and re-clone
+            log_warn "  Directory exists but is not a git repository, removing and re-cloning..."
+            rm -rf "$PRIVATE_CLONE_DIR"
+            git clone "$PRIVATE_REPO" "$PRIVATE_CLONE_DIR"
+        fi
     else
         log_info "  Cloning gaia-private..."
         git clone "$PRIVATE_REPO" "$PRIVATE_CLONE_DIR"
@@ -76,10 +84,18 @@ setup_campaigns_clone() {
     log_info "Setting up gaia-campaigns..."
 
     if [ -d "$CAMPAIGNS_CLONE_DIR" ]; then
-        log_info "  gaia-campaigns already cloned, pulling latest..."
-        (cd "$CAMPAIGNS_CLONE_DIR" && git pull origin main) || {
-            log_warn "  Pull failed - you may need to resolve conflicts"
-        }
+        # Check if it's actually a git repository
+        if [ -d "$CAMPAIGNS_CLONE_DIR/.git" ]; then
+            log_info "  gaia-campaigns already cloned, pulling latest..."
+            (cd "$CAMPAIGNS_CLONE_DIR" && git pull origin main) || {
+                log_warn "  Pull failed - you may need to resolve conflicts"
+            }
+        else
+            # Directory exists but is not a git repo - remove and re-clone
+            log_warn "  Directory exists but is not a git repository, removing and re-cloning..."
+            rm -rf "$CAMPAIGNS_CLONE_DIR"
+            git clone "$CAMPAIGNS_REPO" "$CAMPAIGNS_CLONE_DIR"
+        fi
     else
         log_info "  Cloning gaia-campaigns..."
         git clone "$CAMPAIGNS_REPO" "$CAMPAIGNS_CLONE_DIR"
@@ -105,27 +121,6 @@ create_private_symlink() {
 
     ln -sf "$PRIVATE_CLONE_DIR" "$PRIVATE_LINK"
     log_info "  Linked: backend/src/gaia_private/ -> ../../../gaia-private/"
-}
-
-# Create symlink for campaigns
-create_campaigns_symlink() {
-    log_info "Creating gaia_campaigns symlink..."
-
-    if [ ! -d "$CAMPAIGNS_CLONE_DIR" ]; then
-        log_warn "  gaia-campaigns not cloned - skipping"
-        return
-    fi
-
-    # Remove existing symlink or directory
-    if [ -L "$CAMPAIGNS_LINK" ]; then
-        rm "$CAMPAIGNS_LINK"
-    elif [ -d "$CAMPAIGNS_LINK" ]; then
-        log_warn "  backend/src/gaia_campaigns/ exists as directory, backing up..."
-        mv "$CAMPAIGNS_LINK" "${CAMPAIGNS_LINK}.bak"
-    fi
-
-    ln -sf "$CAMPAIGNS_CLONE_DIR" "$CAMPAIGNS_LINK"
-    log_info "  Linked: backend/src/gaia_campaigns/ -> ../../../gaia-campaigns/"
 }
 
 # Create symlinks for config files
@@ -158,30 +153,28 @@ create_config_symlinks() {
     done
 }
 
-# Create symlinks for secrets
-create_secrets_symlinks() {
-    log_info "Creating secrets symlinks..."
+# Copy secrets files (not symlink - Docker needs real files)
+copy_secrets_files() {
+    log_info "Copying secrets files..."
 
     local secrets_source="$PRIVATE_CLONE_DIR/_secrets"
     local secrets_target="$ROOT_DIR/secrets"
 
     if [ ! -d "$secrets_source" ]; then
-        log_warn "  No _secrets directory in gaia-private - skipping secrets symlinks"
+        log_warn "  No _secrets directory in gaia-private - skipping secrets"
         return
     fi
 
     if [ -f "$secrets_source/.secrets.env" ]; then
         local target="$secrets_target/.secrets.env"
 
-        if [ -L "$target" ]; then
-            rm "$target"
-        elif [ -f "$target" ]; then
-            log_warn "  .secrets.env exists as file, backing up"
-            mv "$target" "${target}.bak"
-        fi
+        # Remove symlink if exists (from old setup)
+        [ -L "$target" ] && rm "$target"
 
-        ln -sf "$secrets_source/.secrets.env" "$target"
-        log_info "  Linked: secrets/.secrets.env"
+        cp "$secrets_source/.secrets.env" "$target"
+        # Preserve restrictive permissions for secrets
+        chmod 600 "$target"
+        log_info "  Copied: secrets/.secrets.env"
     fi
 }
 
@@ -208,69 +201,34 @@ create_infra_symlink() {
     log_info "  Linked: infra/ -> gaia-private/_infra/"
 }
 
-# Create symlinks for service settings files
-create_settings_symlinks() {
-    log_info "Creating service settings symlinks..."
+# Copy service settings files (not symlink - Docker needs real files)
+copy_settings_files() {
+    log_info "Copying service settings files..."
 
     local settings_source="$PRIVATE_CLONE_DIR/_settings"
 
     if [ ! -d "$settings_source" ]; then
-        log_warn "  No _settings directory in gaia-private - skipping settings symlinks"
+        log_warn "  No _settings directory in gaia-private - skipping settings"
         return
     fi
 
     # Frontend settings
     if [ -f "$settings_source/frontend.settings.docker.env" ]; then
         local target="$ROOT_DIR/frontend/.settings.docker.env"
-
-        if [ -L "$target" ]; then
-            rm "$target"
-        elif [ -f "$target" ]; then
-            log_warn "  frontend/.settings.docker.env exists as file, backing up"
-            mv "$target" "${target}.bak"
-        fi
-
-        ln -sf "$settings_source/frontend.settings.docker.env" "$target"
-        log_info "  Linked: frontend/.settings.docker.env"
+        # Remove symlink if exists (from old setup)
+        [ -L "$target" ] && rm "$target"
+        cp "$settings_source/frontend.settings.docker.env" "$target"
+        log_info "  Copied: frontend/.settings.docker.env"
     fi
 
     # Speech-to-text settings
     if [ -f "$settings_source/speech-to-text.settings.docker.env" ]; then
         local target="$ROOT_DIR/speech-to-text/.settings.docker.env"
-
-        if [ -L "$target" ]; then
-            rm "$target"
-        elif [ -f "$target" ]; then
-            log_warn "  speech-to-text/.settings.docker.env exists as file, backing up"
-            mv "$target" "${target}.bak"
-        fi
-
-        ln -sf "$settings_source/speech-to-text.settings.docker.env" "$target"
-        log_info "  Linked: speech-to-text/.settings.docker.env"
+        # Remove symlink if exists (from old setup)
+        [ -L "$target" ] && rm "$target"
+        cp "$settings_source/speech-to-text.settings.docker.env" "$target"
+        log_info "  Copied: speech-to-text/.settings.docker.env"
     fi
-}
-
-# Create symlink for scripts directory
-create_scripts_symlink() {
-    log_info "Creating scripts symlink..."
-
-    local scripts_source="$PRIVATE_CLONE_DIR/_scripts"
-    local scripts_target="$ROOT_DIR/scripts"
-
-    if [ ! -d "$scripts_source" ]; then
-        log_warn "  No _scripts directory in gaia-private - skipping"
-        return
-    fi
-
-    if [ -L "$scripts_target" ]; then
-        rm "$scripts_target"
-    elif [ -d "$scripts_target" ]; then
-        log_warn "  scripts/ exists as directory, backing up to scripts.bak/"
-        mv "$scripts_target" "${scripts_target}.bak"
-    fi
-
-    ln -sf "$scripts_source" "$scripts_target"
-    log_info "  Linked: scripts/ -> gaia-private/_scripts/"
 }
 
 # Create symlink for campaign_storage directory
@@ -323,18 +281,6 @@ verify_setup() {
         log_warn "  ✗ backend/src/gaia_private symlink missing"
     fi
 
-    if [ -L "$CAMPAIGNS_LINK" ]; then
-        log_info "  ✓ backend/src/gaia_campaigns symlink"
-    else
-        log_warn "  ✗ backend/src/gaia_campaigns symlink missing"
-    fi
-
-    if [ -L "$ROOT_DIR/scripts" ]; then
-        log_info "  ✓ scripts/ symlink"
-    else
-        log_warn "  ✗ scripts/ symlink missing"
-    fi
-
     if [ -L "$ROOT_DIR/infra" ]; then
         log_info "  ✓ infra/ symlink"
     else
@@ -372,12 +318,10 @@ main() {
     setup_private_clone
     setup_campaigns_clone
     create_private_symlink
-    create_campaigns_symlink
     create_config_symlinks
-    create_secrets_symlinks
+    copy_secrets_files
     create_infra_symlink
-    create_settings_symlinks
-    create_scripts_symlink
+    copy_settings_files
     create_campaign_storage_symlink
     verify_setup
 

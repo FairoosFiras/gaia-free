@@ -15,7 +15,7 @@ USER gaia
 WORKDIR /home/gaia
 
 # Install Python dependencies
-COPY --chown=gaia:gaia requirements.txt ./requirements.txt
+COPY --chown=gaia:gaia backend/requirements.txt ./requirements.txt
 RUN pip install --user --no-cache-dir -r requirements.txt
 
 # Set environment
@@ -25,11 +25,11 @@ ENV PATH=/home/gaia/.local/bin:$PATH \
     PYTHONPATH=/home/gaia:/home/gaia/src
 
 # Copy application code
-COPY --chown=gaia:gaia src/ ./src/
-COPY --chown=gaia:gaia scripts/ ./scripts/
+COPY --chown=gaia:gaia backend/src/ ./src/
+COPY --chown=gaia:gaia scripts/backend/ ./scripts/
 
 # Expose Cloud Run port
 EXPOSE 8080
 
 # Use Cloud Run entrypoint
-ENTRYPOINT ["python", "/home/gaia/backend/scripts/entrypoint_cloud_run.py"]
+ENTRYPOINT ["python", "/home/gaia/scripts/entrypoint_cloud_run.py"]

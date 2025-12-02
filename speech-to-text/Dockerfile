@@ -29,7 +29,7 @@ COPY db/ /app/db/
 COPY speech-to-text/.settings.docker.env /app/.env
 
 # Copy entrypoint script
-COPY speech-to-text/scripts/docker-entrypoint-with-secrets.sh /app/docker-entrypoint.sh
+COPY scripts/speech-to-text/docker-entrypoint-with-secrets.sh /app/docker-entrypoint.sh
 RUN chmod +x /app/docker-entrypoint.sh
 
 # Create directories

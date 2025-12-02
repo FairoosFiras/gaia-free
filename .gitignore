@@ -142,6 +142,7 @@ celerybeat.pid
 .envrc
 .settings.env
 .settings.docker.env
+!*.settings.docker.env.example
 .venv
 env/
 venv/
@@ -299,8 +300,6 @@ secrets/
 
 # Symlinks to private repos (created by setup-private.sh)
 backend/src/gaia_private
-backend/src/gaia_campaigns
-scripts
 infra
 campaign_storage
 

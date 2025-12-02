@@ -101,6 +101,30 @@ jobs:
         with:
           ref: ${{ inputs.ref || github.ref }}
 
+      - name: Checkout private repo
+        uses: actions/checkout@v4
+        with:
+          repository: Boundless-Studios/gaia-private
+          path: gaia-private
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+
+      - name: Inject private files
+        run: |
+          # Config files
+          mkdir -p config
+          cp -r gaia-private/_config/* config/ 2>/dev/null || true
+
+          # Secrets
+          mkdir -p secrets
+          cp -r gaia-private/_secrets/* secrets/ 2>/dev/null || true
+
+          # Settings files (Docker needs real files, not symlinks)
+          cp gaia-private/_settings/frontend.settings.docker.env frontend/.settings.docker.env 2>/dev/null || true
+          cp gaia-private/_settings/speech-to-text.settings.docker.env speech-to-text/.settings.docker.env 2>/dev/null || true
+
+          # Clean up private checkout
+          rm -rf gaia-private
+
       - name: Load config defaults (config/gcp.env)
         run: |
           if [[ -f config/gcp.env ]]; then
