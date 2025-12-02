@@ -300,6 +300,7 @@ secrets/
 
 # Symlinks to private repos (created by setup-private.sh)
 backend/src/gaia_private
+scripts/private
 infra
 campaign_storage
 

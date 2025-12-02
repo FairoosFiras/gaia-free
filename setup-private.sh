@@ -23,6 +23,7 @@ CAMPAIGNS_CLONE_DIR="$PARENT_DIR/gaia-campaigns"
 
 # Symlink targets inside gaia-free
 PRIVATE_LINK="$ROOT_DIR/backend/src/gaia_private"
+PRIVATE_SCRIPTS_LINK="$ROOT_DIR/scripts/private"
 # Note: campaigns go at root level as campaign_storage/, not under backend/src/
 
 # Colors for output
@@ -121,6 +122,27 @@ create_private_symlink() {
 
     ln -sf "$PRIVATE_CLONE_DIR" "$PRIVATE_LINK"
     log_info "  Linked: backend/src/gaia_private/ -> ../../../gaia-private/"
+}
+
+# Create symlink for private scripts
+create_private_scripts_symlink() {
+    log_info "Creating private scripts symlink..."
+
+    if [ ! -d "$PRIVATE_CLONE_DIR/_scripts" ]; then
+        log_warn "  gaia-private/_scripts not found - skipping"
+        return
+    fi
+
+    # Remove existing symlink or directory
+    if [ -L "$PRIVATE_SCRIPTS_LINK" ]; then
+        rm "$PRIVATE_SCRIPTS_LINK"
+    elif [ -d "$PRIVATE_SCRIPTS_LINK" ]; then
+        log_warn "  scripts/private/ exists as directory, backing up..."
+        mv "$PRIVATE_SCRIPTS_LINK" "${PRIVATE_SCRIPTS_LINK}.bak"
+    fi
+
+    ln -sf "$PRIVATE_CLONE_DIR/_scripts" "$PRIVATE_SCRIPTS_LINK"
+    log_info "  Linked: scripts/private/ -> gaia-private/_scripts/"
 }
 
 # Create symlinks for config files
@@ -281,6 +303,12 @@ verify_setup() {
         log_warn "  ✗ backend/src/gaia_private symlink missing"
     fi
 
+    if [ -L "$PRIVATE_SCRIPTS_LINK" ]; then
+        log_info "  ✓ scripts/private symlink"
+    else
+        log_warn "  ✗ scripts/private symlink missing"
+    fi
+
     if [ -L "$ROOT_DIR/infra" ]; then
         log_info "  ✓ infra/ symlink"
     else
@@ -318,6 +346,7 @@ main() {
     setup_private_clone
     setup_campaigns_clone
     create_private_symlink
+    create_private_scripts_symlink
     create_config_symlinks
     copy_secrets_files
     create_infra_symlink
