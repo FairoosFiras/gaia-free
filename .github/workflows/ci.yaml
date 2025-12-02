@@ -79,6 +79,12 @@ jobs:
           mkdir -p "$(dirname ${SOPS_AGE_KEY_FILE})"
           echo "${{ secrets.SOPS_AGE_KEY }}" > ${SOPS_AGE_KEY_FILE}
 
+      - name: Clone private repo and copy settings
+        run: |
+          git clone https://x-access-token:${{ secrets.PAT }}@github.com/Boundless-Studios/gaia-private.git ../gaia-private
+          cp ../gaia-private/_settings/frontend.settings.docker.env frontend/.settings.docker.env
+          cp ../gaia-private/_settings/speech-to-text.settings.docker.env speech-to-text/.settings.docker.env
+
       - name: Build docker images
         run: |
           make build > build.log 2>&1 || {
