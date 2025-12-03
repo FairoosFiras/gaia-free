@@ -38,4 +38,4 @@ COPY --chown=gaia:gaia . .
 EXPOSE 8080
 
 # Use the lightweight Cloud Run entrypoint
-ENTRYPOINT ["python", "/home/gaia/backend/scripts/entrypoint_cloud_run.py"]
+ENTRYPOINT ["python", "/home/gaia/scripts/backend/entrypoint_cloud_run.py"]

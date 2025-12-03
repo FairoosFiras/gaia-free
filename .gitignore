@@ -215,8 +215,8 @@ __marimo__/
 venv
 
 #project bits
-src/frontend/package-lock.json
-package-lock.json
+# Keep frontend package-lock.json for reproducible builds
+!frontend/package-lock.json
 build
 .cursor
 .vscode

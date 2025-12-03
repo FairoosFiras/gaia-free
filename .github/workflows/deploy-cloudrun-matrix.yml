@@ -91,7 +91,7 @@ jobs:
             repo_suffix: gaia-tts
 
     env:
-      PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
+      PROJECT_ID: ${{ vars.GCP_PROJECT_ID }}
       REGION: ${{ inputs.region || 'us-west1' }}
       ENV_NAME: ${{ (github.event_name == 'push' && github.ref == 'refs/heads/main') && 'prod' || inputs.environment || 'stg' }}
 
