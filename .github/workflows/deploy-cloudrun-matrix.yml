@@ -118,7 +118,7 @@ jobs:
 
           # Config files
           mkdir -p config
-          cp -r gaia-private/_config/* config/ 2>/dev/null || true
+          cp -r gaia-private/_config/. config/ 2>/dev/null || true
 
           # Secrets (required for deployment)
           mkdir -p secrets
