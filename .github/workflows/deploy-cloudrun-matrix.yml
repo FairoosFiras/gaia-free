@@ -159,6 +159,24 @@ jobs:
           fi
           echo "Settings files copied successfully"
 
+          # Copy gaia_private Python package (backend imports from it)
+          echo "Copying gaia_private Python package..."
+          mkdir -p gaia_private
+          # Copy non-underscore directories (the actual Python package modules)
+          for dir in gaia-private/*/; do
+            dirname=$(basename "$dir")
+            # Skip underscore-prefixed directories (config, secrets, settings, scripts, infra)
+            if [[ "$dirname" != _* && "$dirname" != ".git" ]]; then
+              cp -r "$dir" "gaia_private/"
+              echo "  Copied $dirname"
+            fi
+          done
+          # Copy __init__.py and any root-level .py files
+          cp gaia-private/__init__.py gaia_private/ 2>/dev/null || true
+          cp gaia-private/*.py gaia_private/ 2>/dev/null || true
+          echo "gaia_private package copied:"
+          ls -la gaia_private/
+
           # Clean up private checkout
           rm -rf gaia-private
 
