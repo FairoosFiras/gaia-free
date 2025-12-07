@@ -68,6 +68,10 @@ class PlayerCharacterContext(BaseModel):
         return not (self.character_id or self.character_name)
 
 
+# Player options models are defined in gaia.models.player_options
+# Use .to_dict() for API serialization
+
+
 class StructuredGameData(BaseModel):
     """
     Structured data for game responses.
@@ -77,7 +81,15 @@ class StructuredGameData(BaseModel):
     turn: Optional[Union[str, Dict, List]] = Field(default="", description="Current turn information")
     status: Optional[Union[str, Dict]] = Field(default="", description="Current game status")
     characters: Optional[Union[str, Dict, List]] = Field(default="", description="Character information")
-    player_options: Optional[Union[str, List[str]]] = Field(default="", description="Available player actions")
+    player_options: Optional[Union[str, List[str]]] = Field(default="", description="Available player actions (legacy single-list format)")
+    personalized_player_options: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Per-player options. Each character gets their own options based on their role (active vs observer). Structure from PersonalizedPlayerOptions.to_dict()"
+    )
+    pending_observations: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Observations from secondary players waiting to be included in primary player's turn. Structure from PendingObservations.to_dict()"
+    )
     combat_status: Optional[Dict[str, Any]] = Field(default=None, description="Per-combatant status used by combat dashboards")
     combat_state: Optional[Dict[str, Any]] = Field(default=None, description="Detailed combat persistence snapshot")
     action_breakdown: Optional[Union[List, Dict]] = Field(default=None, description="Structured action breakdown from combat agents")

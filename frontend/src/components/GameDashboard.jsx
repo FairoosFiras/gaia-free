@@ -39,7 +39,25 @@ const GameDashboard = forwardRef(
     collabPlayerName = 'DM',
     collabAllPlayers = [],
     collabIsConnected = false,
+    // Personalized player options props
+    currentCharacterId = null,
+    isActivePlayer = true, // True if current user is the turn-taker
+    pendingObservations = [], // Observations from other players
+    onSubmitObservation = null, // Callback for secondary players to submit observations
+    onCopyObservation = null, // Callback for primary player to copy an observation
+    // Player submissions (from player action submissions)
+    playerSubmissions = [],
+    onCopyPlayerSubmission = null,
   }, ref) => {
+  // Debug: Log player submissions received by GameDashboard
+  console.log('📋 GameDashboard render:', {
+    playerSubmissionsCount: playerSubmissions?.length,
+    playerSubmissions,
+    hasPlayerOptions: !!(latestStructuredData?.player_options || latestStructuredData?.turn),
+    isActivePlayer,
+    pendingObservationsCount: pendingObservations?.length
+  });
+
   // Audio now handled by synchronized streaming via WebSocket
   const sessionForRequest = campaignId || 'default-session';
 
@@ -138,7 +156,9 @@ const GameDashboard = forwardRef(
   const streamingInProgress = Boolean(isNarrativeStreaming || isResponseStreaming);
   const hasPlayerOptions = Boolean(
     (latestStructuredData?.turn && String(latestStructuredData.turn).trim()) ||
-    (latestStructuredData?.player_options && String(latestStructuredData.player_options).trim())
+    (latestStructuredData?.player_options && String(latestStructuredData.player_options).trim()) ||
+    (latestStructuredData?.personalized_player_options?.characters &&
+     Object.keys(latestStructuredData.personalized_player_options.characters).length > 0)
   );
 
   // Handle collaborative text submission
@@ -168,6 +188,43 @@ const GameDashboard = forwardRef(
       onInputChange({ target: { value: inputMessage + separator + optionText } });
     }
   }, [collabWebSocket, onInputChange, inputMessage]);
+
+  // Handle copying an observation from a secondary player to the primary player's input
+  const handleCopyObservationToChat = useCallback((observation) => {
+    // Format: "[CharacterName observes]: observation text"
+    const formattedObservation = `[${observation.character_name} observes]: ${observation.observation_text}`;
+
+    if (collabWebSocket && collabEditorRef.current?.insertText) {
+      // Using collaborative editor - insert via ref
+      collabEditorRef.current.insertText(formattedObservation);
+    } else if (onInputChange) {
+      // Fallback to regular input - append to existing message
+      const separator = inputMessage.trim() ? '\n\n' : '';
+      onInputChange({ target: { value: inputMessage + separator + formattedObservation } });
+    }
+  }, [collabWebSocket, onInputChange, inputMessage]);
+
+  // Handle copying a player submission to the DM's input
+  const handleCopyPlayerSubmission = useCallback((submission) => {
+    if (!submission) return;
+
+    // Format: "[CharacterName]: action text"
+    const formattedAction = `[${submission.characterName}]: ${submission.actionText}`;
+
+    if (collabWebSocket && collabEditorRef.current?.insertText) {
+      // Using collaborative editor - insert via ref
+      collabEditorRef.current.insertText(formattedAction);
+    } else if (onInputChange) {
+      // Fallback to regular input - append to existing message
+      const separator = inputMessage.trim() ? '\n\n' : '';
+      onInputChange({ target: { value: inputMessage + separator + formattedAction } });
+    }
+
+    // Remove the submission after copying
+    if (onCopyPlayerSubmission) {
+      onCopyPlayerSubmission(submission);
+    }
+  }, [collabWebSocket, onInputChange, inputMessage, onCopyPlayerSubmission]);
 
   const streamingPanel = (
     <div className="dashboard-streaming-panel">
@@ -335,14 +392,22 @@ const GameDashboard = forwardRef(
         {/* Player Options + Input - Right side 25% */}
         <div className="dashboard-player-options-section">
           <div className="dashboard-player-options-list">
-            {hasPlayerOptions ? (
+            {hasPlayerOptions || (isActivePlayer && pendingObservations.length > 0) || playerSubmissions.length > 0 ? (
               <TurnView
                 turn={latestStructuredData.player_options || latestStructuredData.turn}
+                personalizedPlayerOptions={latestStructuredData.personalized_player_options}
+                currentCharacterId={currentCharacterId}
+                pendingObservations={pendingObservations}
+                isActivePlayer={isActivePlayer}
+                onCopyObservation={onCopyObservation || handleCopyObservationToChat}
                 showHeader={true}
                 onPlayStop={handlePlayStopOptions}
                 isPlaying={false}
                 onCopyToChat={handleCopyPlayerOptionToChat}
                 turnInfo={latestStructuredData.turn_info}
+                playerSubmissions={playerSubmissions}
+                onCopyPlayerSubmission={handleCopyPlayerSubmission}
+                isDMView={true}
               />
             ) : (
               <div className="dashboard-player-options-empty">
@@ -383,14 +448,37 @@ const GameDashboard = forwardRef(
                     </span>
                   </div>
                   <div className="dashboard-input-actions">
-                    <button
-                      onClick={handleCollabButtonClick}
-                      className="dashboard-submit-button"
-                      title="Submit your input"
-                      disabled={!collabEditorHasDraft || isChatProcessing}
-                    >
-                      Submit
-                    </button>
+                    {isActivePlayer ? (
+                      <button
+                        onClick={handleCollabButtonClick}
+                        className="dashboard-submit-button"
+                        title="Submit your turn to the DM"
+                        disabled={!collabEditorHasDraft || isChatProcessing}
+                      >
+                        Submit
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => {
+                          // Secondary player: submit as observation to primary player
+                          if (onSubmitObservation && collabEditorRef.current?.getMyContent) {
+                            const content = collabEditorRef.current.getMyContent();
+                            if (content && content.trim()) {
+                              onSubmitObservation(content.trim());
+                              collabEditorRef.current.clearMySection?.();
+                            }
+                          } else {
+                            // Fallback to regular submit
+                            handleCollabButtonClick();
+                          }
+                        }}
+                        className="dashboard-submit-button dashboard-submit-button--observation"
+                        title="Share your observation with the active player"
+                        disabled={!collabEditorHasDraft || isChatProcessing}
+                      >
+                        Share Observation
+                      </button>
+                    )}
                     {onToggleTranscription && (
                       <button
                         onClick={onToggleTranscription}

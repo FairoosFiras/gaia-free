@@ -27,6 +27,10 @@ from gaia.api.schemas.chat import (
     AudioArtifactPayload,
     PlayerCharacterContext,
 )
+from gaia.services.player_options_service import (
+    PlayerOptionsService,
+    get_observations_manager,
+)
 from auth.src.flexible_auth import optional_auth
 from gaia.infra.audio.auto_tts_service import auto_tts_service
 from gaia.infra.audio.playback_request_writer import PlaybackRequestWriter
@@ -146,6 +150,18 @@ def _extract_player_character_context(chat_request: ChatRequest) -> Optional[Pla
         return None
 
     return None if context.is_empty() else context
+
+
+# Global player options service instance
+_player_options_service: Optional[PlayerOptionsService] = None
+
+
+def _get_player_options_service() -> PlayerOptionsService:
+    """Get the global player options service instance."""
+    global _player_options_service
+    if _player_options_service is None:
+        _player_options_service = PlayerOptionsService()
+    return _player_options_service
 
 
 def transform_structured_data(data: dict) -> StructuredGameData:
@@ -313,6 +329,29 @@ async def chat(
             structured_data.generated_image_path = image_data.get("local_path", "")
             structured_data.generated_image_prompt = image_data.get("prompt", "")
             structured_data.generated_image_type = image_data.get("type", "")
+
+        # Generate personalized player options for all connected players
+        try:
+            service = _get_player_options_service()
+            personalized_options = await service.generate_options_dict(
+                campaign_id=session_id,
+                structured_data=structured_data_raw,
+            )
+            if personalized_options:
+                structured_data.personalized_player_options = personalized_options
+                characters = personalized_options.get("characters", {})
+                logger.info("[PlayerOptions] Generated personalized options for %d characters", len(characters))
+
+                # Broadcast personalized options via WebSocket
+                if characters:
+                    await socketio_broadcaster.broadcast_campaign_update(
+                        session_id,
+                        "personalized_player_options",
+                        {"personalized_player_options": personalized_options}
+                    )
+        except Exception as opts_err:
+            logger.warning("[PlayerOptions] Failed to generate personalized options: %s", opts_err)
+            # Continue without personalized options - fall back to legacy player_options
 
         machine_response = MachineResponse(
             session_id=session_id,

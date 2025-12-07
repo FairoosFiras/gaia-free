@@ -21,15 +21,20 @@ import CollaborativeEditorTest from './pages/CollaborativeEditorTest.jsx';
 // This component just shows a loading state while Auth0 processes the callback
 const Auth0Callback = () => {
   const { isAuthenticated, isLoading, error, user } = useAuth0();
+  const navigate = useNavigate();
 
   React.useEffect(() => {
     if (!isLoading) {
       console.log('[AUTH0_DEBUG] Callback processed, isAuthenticated:', isAuthenticated);
       console.log('[AUTH0_DEBUG] User info:', user);
-      // Note: Navigation is handled by onRedirectCallback in Auth0Provider
-      // which receives appState.returnTo and navigates there
+      // If authenticated and not loading, navigate to home
+      // This handles cases where onRedirectCallback doesn't fire (e.g., cached tokens)
+      if (isAuthenticated) {
+        console.log('[AUTH0_DEBUG] Navigating to home after auth');
+        navigate('/');
+      }
     }
-  }, [isAuthenticated, isLoading, user]);
+  }, [isAuthenticated, isLoading, user, navigate]);
   
   if (error) {
     console.error('[AUTH0_DEBUG] Callback error:', error);
@@ -79,9 +84,13 @@ const ProtectedRoute = ({ children }) => {
   const [registrationStatus, setRegistrationStatus] = React.useState('checking'); // checking, pending, completed
   const [showRegistration, setShowRegistration] = React.useState(false);
 
+  // Debug logging
+  console.log('[ProtectedRoute] State:', { loading, isAuthenticated, user: !!user, registrationStatus });
+
   React.useEffect(() => {
     // If not authenticated and not loading, trigger login with returnTo
     if (!loading && !isAuthenticated) {
+      console.log('[ProtectedRoute] Not authenticated, triggering login');
       const returnTo = location.pathname + location.search;
       login({ appState: { returnTo } });
     }
@@ -90,21 +99,26 @@ const ProtectedRoute = ({ children }) => {
   // Check registration status after authentication
   React.useEffect(() => {
     if (isAuthenticated && user) {
+      console.log('[ProtectedRoute] Authenticated, checking registration status');
       checkRegistrationStatus();
     }
   }, [isAuthenticated, user]);
 
   const checkRegistrationStatus = async () => {
     try {
+      console.log('[ProtectedRoute] Getting access token...');
       const token = await getAccessTokenSilently();
+      console.log('[ProtectedRoute] Got token, fetching registration status...');
       const response = await fetch('/api/auth/registration-status', {
         headers: {
           Authorization: `Bearer ${token}`,
         },
       });
+      console.log('[ProtectedRoute] Registration status response:', response.status);
 
       if (response.ok) {
         const status = await response.json();
+        console.log('[ProtectedRoute] Registration status:', status);
         // Show registration flow if user hasn't completed registration OR if they're awaiting approval
         if (status.registration_status === 'pending' || !status.is_authorized) {
           setRegistrationStatus('pending');

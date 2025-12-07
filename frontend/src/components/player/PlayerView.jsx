@@ -31,8 +31,22 @@ const PlayerView = ({
   collabPlayerName = '',
   collabAllPlayers = [],
   collabIsConnected = false,
-  collabEditorRef = null
+  collabEditorRef = null,
+  // Personalized player options props
+  currentCharacterId = null,
+  isActivePlayer = true,
+  pendingObservations = [],
+  onCopyObservation = null,
+  // Secondary player observation submission
+  onSubmitObservation = null
 }) => {
+  // Debug: Log observations props received by PlayerView
+  console.log('👁️ PlayerView render:', {
+    isActivePlayer,
+    pendingObservationsCount: pendingObservations?.length,
+    hasOnCopyObservation: !!onCopyObservation
+  });
+
   const [error, setError] = useState(null);
   const [currentCharacter] = useState(characterData);
   const [gameState, setGameState] = useState(latestStructuredData);
@@ -236,6 +250,13 @@ const PlayerView = ({
             collabIsConnected={collabIsConnected}
             // Ref for voice transcription integration
             collabEditorRef={collabEditorRef}
+            // Personalized player options props
+            currentCharacterId={currentCharacterId}
+            isActivePlayer={isActivePlayer}
+            pendingObservations={pendingObservations}
+            onCopyObservation={onCopyObservation}
+            // Secondary player observation submission
+            onSubmitObservation={onSubmitObservation}
           />
         </div>
       </div>

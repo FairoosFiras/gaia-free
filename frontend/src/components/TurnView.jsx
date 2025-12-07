@@ -1,46 +1,230 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import './TurnView.css';
 import './ChatMessage.css';
 
-const TurnView = ({ turn, className = '', showHeader = true, onPlayStop, isPlaying, onCopyToChat, turnInfo }) => {
-  if (!turn) return null;
-
-  let processedTurn = turn;
-  let turnLines = [];
-
-  // Handle different turn formats
-  if (Array.isArray(turn)) {
-    // turn is an array of player options
-    turnLines = turn.filter(line => line && line.trim());
-  } else if (typeof turn === 'string') {
-    // If turn is a string that looks like JSON, try to parse it
-    if (turn.trim().startsWith('{')) {
-      try {
-        const parsed = JSON.parse(turn);
-        // Convert the parsed object to a readable string
-        if (typeof parsed === 'object') {
-          processedTurn = Object.entries(parsed)
-            .map(([key, value]) => `${key}: ${value}`)
-            .join('\n');
+/**
+ * TurnView - Displays player options for the current character.
+ *
+ * Supports two formats:
+ * 1. Legacy: `turn` prop is an array or string of options (shared across all players)
+ * 2. Personalized: `personalizedPlayerOptions` prop contains per-character options
+ *
+ * Also displays pending observations from other players when the user is the active player.
+ */
+const TurnView = ({
+  turn,
+  personalizedPlayerOptions,
+  currentCharacterId,
+  pendingObservations = [],
+  isActivePlayer = true,
+  onCopyObservation,
+  className = '',
+  showHeader = true,
+  onPlayStop,
+  isPlaying,
+  onCopyToChat,
+  turnInfo,
+  // Player submissions (from players clicking "Submit Action")
+  playerSubmissions = [],
+  onCopyPlayerSubmission,
+  // DM mode - only show player submissions, no player options
+  isDMView = false,
+}) => {
+  // Debug: Log what TurnView receives
+  console.log('📋 TurnView render:', {
+    playerSubmissionsCount: playerSubmissions?.length,
+    playerSubmissions,
+    pendingObservationsCount: pendingObservations?.length,
+    isActivePlayer
+  });
+  // Determine which options to display and whether user is active
+  const { turnLines, isActive, characterName } = useMemo(() => {
+    // If personalized options are available and we have a character ID, use those
+    if (personalizedPlayerOptions && currentCharacterId) {
+      const charOptions = personalizedPlayerOptions.characters?.[currentCharacterId];
+      if (charOptions) {
+        return {
+          turnLines: charOptions.options || [],
+          isActive: charOptions.is_active || false,
+          characterName: charOptions.character_name || 'You'
+        };
+      }
+      // Character not found in personalized options - check if active character exists
+      if (personalizedPlayerOptions.active_character_id) {
+        const activeOptions = personalizedPlayerOptions.characters?.[personalizedPlayerOptions.active_character_id];
+        if (activeOptions) {
+          // Show active player's options with indication it's not their turn
+          return {
+            turnLines: activeOptions.options || [],
+            isActive: false,
+            characterName: activeOptions.character_name || 'Active Player'
+          };
         }
-      } catch {
-        // If parsing fails, keep it as a string
-        processedTurn = turn;
       }
     }
-    // Split string into lines
-    turnLines = processedTurn.split('\n').filter(line => line.trim());
+
+    // Fall back to legacy format
+    if (!turn) {
+      return { turnLines: [], isActive: isActivePlayer, characterName: null };
+    }
+
+    let processedTurn = turn;
+    let lines = [];
+
+    // Handle different turn formats
+    if (Array.isArray(turn)) {
+      lines = turn.filter(line => line && line.trim());
+    } else if (typeof turn === 'string') {
+      // If turn is a string that looks like JSON, try to parse it
+      if (turn.trim().startsWith('{')) {
+        try {
+          const parsed = JSON.parse(turn);
+          if (typeof parsed === 'object') {
+            processedTurn = Object.entries(parsed)
+              .map(([key, value]) => `${key}: ${value}`)
+              .join('\n');
+          }
+        } catch {
+          processedTurn = turn;
+        }
+      }
+      lines = processedTurn.split('\n').filter(line => line.trim());
+    }
+
+    return { turnLines: lines, isActive: isActivePlayer, characterName: null };
+  }, [turn, personalizedPlayerOptions, currentCharacterId, isActivePlayer]);
+
+  // Filter pending observations that haven't been included yet
+  const unincludedObservations = useMemo(() => {
+    if (!pendingObservations || !isActive) return [];
+    return pendingObservations.filter(obs => !obs.included_in_turn);
+  }, [pendingObservations, isActive]);
+
+  // Don't render if no content to show
+  // DM mode: only needs player submissions
+  // Player mode: needs options, observations, or submissions
+  if (isDMView) {
+    if (!playerSubmissions || playerSubmissions.length === 0) {
+      return null;
+    }
+  } else {
+    if ((!turnLines || turnLines.length === 0) && unincludedObservations.length === 0 && (!playerSubmissions || playerSubmissions.length === 0)) {
+      return null;
+    }
   }
+
+  // Determine header text
+  const getHeaderText = () => {
+    if (isDMView) {
+      return 'Player Submissions';
+    }
+    if (personalizedPlayerOptions && currentCharacterId) {
+      if (isActive) {
+        return characterName ? `${characterName}'s Turn` : 'Your Turn';
+      } else {
+        return 'Observe & Discover';
+      }
+    }
+    return 'Player Options';
+  };
 
   return (
     <div className={`turn-view base-view ${className}`}>
       {showHeader && (
         <div className="turn-header base-header">
-          <h2 className="turn-title base-title">Player Options</h2>
+          <h2 className="turn-title base-title">{getHeaderText()}</h2>
         </div>
       )}
-      {turn && (
-        <div className="turn-content base-content">
+      <div className="turn-content base-content">
+        {/* Player submissions (from players clicking "Submit Action") */}
+        {playerSubmissions.length > 0 && (
+          <div className="turn-submissions-section">
+            <div className="turn-submissions-header">
+              <span className="turn-submissions-icon">📝</span>
+              <span className="turn-submissions-title">Player Submissions</span>
+              <span className="turn-submissions-count">{playerSubmissions.length}</span>
+            </div>
+            <div className="turn-submissions-list">
+              {playerSubmissions.map((submission) => {
+                // Parse action text to separate main action from observations
+                const observationPattern = /\[([^\]]+) observes\]:\s*([^\[]*)/g;
+                const observations = [];
+                let match;
+                let mainAction = submission.actionText;
+
+                // Extract all observations
+                while ((match = observationPattern.exec(submission.actionText)) !== null) {
+                  observations.push({
+                    observer: match[1],
+                    text: match[2].trim()
+                  });
+                }
+
+                // Remove observations from main action
+                if (observations.length > 0) {
+                  mainAction = submission.actionText.replace(observationPattern, '').trim();
+                }
+
+                return (
+                  <div
+                    key={submission.id}
+                    className="turn-submission-item"
+                    onClick={() => onCopyPlayerSubmission && onCopyPlayerSubmission(submission)}
+                    style={onCopyPlayerSubmission ? { cursor: 'pointer' } : {}}
+                    title={onCopyPlayerSubmission ? "Click to copy to input" : ""}
+                  >
+                    {/* Main action */}
+                    <div className="turn-submission-action">
+                      <span className="turn-submission-author">{submission.characterName}:</span>
+                      <span className="turn-submission-text">{mainAction}</span>
+                    </div>
+
+                    {/* Included observations */}
+                    {observations.length > 0 && (
+                      <div className="turn-submission-observations">
+                        <div className="turn-submission-observations-label">Included observations:</div>
+                        {observations.map((obs, idx) => (
+                          <div key={idx} className="turn-submission-observation">
+                            <span className="turn-submission-observer">{obs.observer}:</span>
+                            <span className="turn-submission-obs-text">{obs.text}</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Pending observations from other players (shown to active player) */}
+        {unincludedObservations.length > 0 && (
+          <div className="turn-observations-section">
+            <div className="turn-observations-header">
+              <span className="turn-observations-icon">👁️</span>
+              <span className="turn-observations-title">Party Observations</span>
+              <span className="turn-observations-count">{unincludedObservations.length}</span>
+            </div>
+            <div className="turn-observations-list">
+              {unincludedObservations.map((observation, index) => (
+                <div
+                  key={`obs-${observation.character_id}-${index}`}
+                  className="turn-observation-item"
+                  onClick={() => onCopyObservation && onCopyObservation(observation)}
+                  style={onCopyObservation ? { cursor: 'pointer' } : {}}
+                  title={onCopyObservation ? "Click to add to your turn" : ""}
+                >
+                  <span className="turn-observation-author">{observation.character_name}:</span>
+                  <span className="turn-observation-text">{observation.observation_text}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Player options - hidden in DM view */}
+        {!isDMView && turnLines.length > 0 && (
           <div className="turn-text base-text">
             {turnLines.map((line, index) => (
               <div
@@ -56,8 +240,8 @@ const TurnView = ({ turn, className = '', showHeader = true, onPlayStop, isPlayi
               </div>
             ))}
           </div>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 };
