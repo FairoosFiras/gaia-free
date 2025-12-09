@@ -285,6 +285,8 @@ const PlayerControls = ({
                     showMicButton={audioPermissionState === 'granted'}
                     voiceLevel={voiceActivityLevel}
                     showInlineSubmit={isActivePlayer}
+                    audioNeedsUnlock={userAudioBlocked}
+                    onUnlockAudio={onUnlockUserAudio}
                   />
                 </div>
               </div>
@@ -483,16 +485,6 @@ const PlayerControls = ({
             )}
           </button>
         ))}
-        {/* Inline audio unlock indicator */}
-        {userAudioBlocked && onUnlockUserAudio && (
-          <button
-            className="audio-unlock-inline"
-            onClick={onUnlockUserAudio}
-            title="Tap to enable audio"
-          >
-            🔊
-          </button>
-        )}
       </div>
 
       {/* Tab Content */}
