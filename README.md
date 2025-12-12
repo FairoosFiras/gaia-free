@@ -128,3 +128,10 @@ You will be prompted to sign the agreement digitally via our CLA bot when you op
 
 Please do not contribute if you expect compensation or employment.
 
+<!-- Test PR for CLA agreement -->
+
+<- ❌ Combat initiator prompt template error: Backend database missing prompt template for Test PR for CLA verification -->
+
+<- ❌ Combat initiator prompt template error: Backend database missing prompt template for Test PR for CLA verification -->
+
+<- ❌ Combat initiator prompt template error: Backend database missing prompt template for Test PR for CLA verification -->
