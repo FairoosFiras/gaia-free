@@ -6,7 +6,7 @@ import PlayerAndTurnList from './PlayerAndTurnList/PlayerAndTurnList';
 import CollaborativeStackedEditor from './collaborative/CollaborativeStackedEditor.jsx';
 import apiService from '../services/apiService';
 import './GameDashboard.css';
-import StreamingNarrativeView from './player/StreamingNarrativeView.jsx';
+import TurnBasedNarrativeView from './player/TurnBasedNarrativeView.jsx';
 import { useRoom } from '../contexts/RoomContext.jsx';
 import RoomManagementDrawer from './dm/RoomManagementDrawer.jsx';
 import Button from './base-ui/Button.jsx';
@@ -22,6 +22,8 @@ const GameDashboard = forwardRef(
     isResponseStreaming = false,
     onDebugStreamPreview,
     messages = [],
+    // Turn-based message system props
+    turns = [],
     // Chat input props
     inputMessage = '',
     onInputChange,
@@ -47,7 +49,8 @@ const GameDashboard = forwardRef(
     onCopyObservation = null, // Callback for primary player to copy an observation
     // Player submissions (from player action submissions)
     playerSubmissions = [],
-    onCopyPlayerSubmission = null,
+    selectedPlayerSubmissionIds = new Set(),
+    onTogglePlayerSubmission = null,
   }, ref) => {
   // Debug: Uncomment for detailed render logging
   // console.log('📋 GameDashboard render:', { messagesCount: messages?.length });
@@ -108,7 +111,15 @@ const GameDashboard = forwardRef(
 
   const structuredData = latestStructuredData || {};
   const turnInfo = structuredData.turn_info || {};
-  const combatStatus = structuredData.combat_status || {};
+  const nextInteractionType = (structuredData.next_interaction_type
+    || structuredData.original_data?.next_interaction_type
+    || '').toLowerCase();
+  const combatEnded = structuredData.is_combat_active === false
+    || (structuredData.combat_state
+      && typeof structuredData.combat_state === 'object'
+      && structuredData.combat_state.is_active === false)
+    || nextInteractionType === 'default';
+  const combatStatus = combatEnded ? {} : (structuredData.combat_status || {});
 
   const handlePlayStopOptions = async () => {
     try {
@@ -199,27 +210,6 @@ const GameDashboard = forwardRef(
     }
   }, [collabWebSocket, onInputChange, inputMessage]);
 
-  // Handle copying a player submission to the DM's input
-  const handleCopyPlayerSubmission = useCallback((submission) => {
-    if (!submission) return;
-
-    // Format: "[CharacterName]: action text"
-    const formattedAction = `[${submission.characterName}]: ${submission.actionText}`;
-
-    if (collabWebSocket && collabEditorRef.current?.insertText) {
-      // Using collaborative editor - insert via ref
-      collabEditorRef.current.insertText(formattedAction);
-    } else if (onInputChange) {
-      // Fallback to regular input - append to existing message
-      const separator = inputMessage.trim() ? '\n\n' : '';
-      onInputChange({ target: { value: inputMessage + separator + formattedAction } });
-    }
-
-    // Remove the submission after copying
-    if (onCopyPlayerSubmission) {
-      onCopyPlayerSubmission(submission);
-    }
-  }, [collabWebSocket, onInputChange, inputMessage, onCopyPlayerSubmission]);
 
   const streamingPanel = (
     <div className="dashboard-streaming-panel">
@@ -231,12 +221,12 @@ const GameDashboard = forwardRef(
         </div>
       </div>
       <div className="streaming-panel-body">
-        <StreamingNarrativeView
+        <TurnBasedNarrativeView
           narrative={streamingNarrativeText}
           playerResponse={streamingResponseText}
           isNarrativeStreaming={isNarrativeStreaming}
           isResponseStreaming={isResponseStreaming}
-          messages={messages}
+          turns={turns}
           onImageGenerated={onImageGenerated}
           campaignId={campaignId}
         />
@@ -401,7 +391,8 @@ const GameDashboard = forwardRef(
                 onCopyToChat={handleCopyPlayerOptionToChat}
                 turnInfo={latestStructuredData.turn_info}
                 playerSubmissions={playerSubmissions}
-                onCopyPlayerSubmission={handleCopyPlayerSubmission}
+                selectedPlayerSubmissionIds={selectedPlayerSubmissionIds}
+                onTogglePlayerSubmission={onTogglePlayerSubmission}
                 isDMView={true}
               />
             ) : (
